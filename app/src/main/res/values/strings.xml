@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Smart App</string>
+    <string name="title_activity_dashboard_screen">DashboardScreen</string>
+</resources>
