@@ -22,8 +22,8 @@ import com.amit.application.UI_screen.E_Commerce.ProductDetailRoute
 import com.amit.application.UI_screen.E_Commerce.ProductDetailScreen
 import com.amit.application.UI_screen.Login.LoginScreen
 import com.amit.application.UI_screen.Profile.ProfileScreen
-import com.amit.application.UI_screen.VideoPlayer.LocalVideoScreen
-import com.amit.application.UI_screen.VideoPlayer.VideoPlayerScreen
+import com.amit.application.UI_screen.VideoPlayer.AdvancedVideoListScreen
+import com.amit.application.UI_screen.VideoPlayer.AdvancedVideoPlayerScreen
 import com.amit.application.UI_screen.Wallet.WalletScreen
 import com.google.firebase.auth.FirebaseAuth
 import dagger.hilt.android.AndroidEntryPoint
@@ -79,7 +79,7 @@ fun SuperAppNavigation() {
 
 //      1. The Local Video Grid/List Screen
         composable<AppRoutes.LocalVideoRoute> {
-            LocalVideoScreen(
+            AdvancedVideoListScreen(
                 onVideoClick = { rawUri ->
                     // Crucial Step: We MUST encode the URI string (which contains slashes)
                     // so it doesn't break the navigation route path.
@@ -100,7 +100,7 @@ fun SuperAppNavigation() {
             val decodedUri =
                 URLDecoder.decode(routeData.encodedUri, StandardCharsets.UTF_8.toString())
 
-            VideoPlayerScreen(
+            AdvancedVideoPlayerScreen(
                 videoUriString = decodedUri,
                 // ADD THIS LINE HERE TOO:
                 onBackClick = { navController.popBackStack() }
