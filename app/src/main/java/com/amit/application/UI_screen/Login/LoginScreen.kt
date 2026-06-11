@@ -100,7 +100,7 @@ fun PhoneInputSection(onSendOtpClick: (String) -> Unit) {
         label = { Text("Phone Number") },
         // This locks "+91" inside the text field visually
         prefix = { Text("+91 ") },
-        placeholder = { Text("9876543210") },
+        placeholder = { Text(" - Enter your phone number") },
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
         modifier = Modifier.fillMaxWidth()
     )

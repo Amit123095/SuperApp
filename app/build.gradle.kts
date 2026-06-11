@@ -87,6 +87,9 @@ dependencies {
     // Paging 3
     implementation(libs.androidx.paging.compose)
 
+    // Google Play Services Location
+    implementation(libs.play.services.location)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

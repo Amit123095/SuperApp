@@ -1,4 +1,4 @@
-package com.amit.application.UI_screen.Chat.PhoneContact
+package com.amit.application.UI_screen.Chat.ContactList
 
 import android.content.Context
 import androidx.lifecycle.ViewModel

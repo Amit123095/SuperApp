@@ -1,4 +1,4 @@
-package com.amit.application.UI_screen.Chat
+package com.amit.application.UI_screen.Chat.ChatScreen
 
 import javax.inject.Inject
 import javax.inject.Singleton

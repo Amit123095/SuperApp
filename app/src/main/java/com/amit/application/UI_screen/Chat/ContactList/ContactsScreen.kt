@@ -1,4 +1,4 @@
-package com.amit.application.UI_screen.Chat.PhoneContact
+package com.amit.application.UI_screen.Chat.ContactList
 
 import android.Manifest
 import androidx.activity.compose.rememberLauncherForActivityResult

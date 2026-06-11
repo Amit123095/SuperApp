@@ -14,8 +14,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.amit.application.Routes.AppRoutes
-import com.amit.application.UI_screen.Chat.ChatScreen
-import com.amit.application.UI_screen.Chat.PhoneContact.ContactsScreen
+import com.amit.application.UI_screen.Chat.ChatScreen.ChatScreen
+import com.amit.application.UI_screen.Chat.ContactList.ContactsScreen
 import com.amit.application.UI_screen.DashboardScreen
 import com.amit.application.UI_screen.E_Commerce.EcommerceScreen
 import com.amit.application.UI_screen.E_Commerce.ProductDetailRoute
