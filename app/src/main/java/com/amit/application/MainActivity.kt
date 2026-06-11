@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
@@ -14,7 +15,9 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import com.amit.application.Routes.AppRoutes
+import com.amit.application.UI_screen.Chat.ChatScreen.ChatMessage
 import com.amit.application.UI_screen.Chat.ChatScreen.ChatScreen
+import com.amit.application.UI_screen.Chat.ChatScreen.MessageStatus
 import com.amit.application.UI_screen.Chat.ContactList.ContactsScreen
 import com.amit.application.UI_screen.DashboardScreen
 import com.amit.application.UI_screen.E_Commerce.EcommerceScreen
@@ -63,6 +66,36 @@ fun SuperAppNavigation() {
                         popUpTo<AppRoutes.LoginRoute> { inclusive = true }
                     }
                 }
+            )
+        }
+
+// on click back form chat screen to chat_contact_list screen
+        composable<AppRoutes.ChatRoomRoute> { backStackEntry ->
+            val chatArgs: AppRoutes.ChatRoomRoute = backStackEntry.toRoute()
+
+            // 1. Create a temporary list to hold messages for UI testing
+            val messages = remember {
+                androidx.compose.runtime.mutableStateListOf<ChatMessage>()
+            }
+
+            ChatScreen(
+                messages = messages,
+                onSendMessage = { text, attachmentType, attachmentUri ->
+                    // 2. Add the new message to our UI list when you hit send
+                    messages.add(
+                        0, // Insert at the top of the list (since we use reverseLayout = true)
+                        ChatMessage(
+                            id = java.util.UUID.randomUUID().toString(),
+                            text = text,
+                            timestamp = System.currentTimeMillis(),
+                            isFromMe = true, // Forces it to the right side (Green bubble)
+                            status = MessageStatus.PENDING,
+                            attachmentType = attachmentType,
+                            attachmentUri = attachmentUri
+                        )
+                    )
+                },
+                onBackClick = { navController.popBackStack() }
             )
         }
 
@@ -140,14 +173,6 @@ fun SuperAppNavigation() {
             )
         }
 
-//  Sync the chat room screen with the chat
-        composable<AppRoutes.ChatRoomRoute> { backStackEntry ->
-            val chatArgs: AppRoutes.ChatRoomRoute = backStackEntry.toRoute()
-
-            ChatScreen(
-                onBackClick = { navController.popBackStack() }
-            )
-        }
 
 //  To navigate to the ecommerce screen
         composable<AppRoutes.EcommerceRoute> {

@@ -1,9 +1,11 @@
 package com.amit.application.DI
 
 import android.content.Context
+import android.media.AudioManager
 import com.amit.application.AppUtils.AppBluetoothManager
 import com.amit.application.AppUtils.CameraManager
 import com.amit.application.AppUtils.LocationManager
+import com.amit.application.AppUtils.SuperAppFileManager
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -31,5 +33,20 @@ object AppModule {
     @Singleton
     fun provideBluetoothManager(@ApplicationContext context: Context): AppBluetoothManager {
         return AppBluetoothManager(context)
+    }
+
+    // 1. Teaches Hilt how to provide the File Manager
+    @Provides
+    @Singleton
+    fun provideSuperAppFileManager(): SuperAppFileManager {
+        return SuperAppFileManager
+    }
+
+    // 2. (Optional but recommended) Teaches Hilt how to provide the AudioManager
+    // in case you need it in your ViewModels for Voice Notes later!
+    @Provides
+    @Singleton
+    fun provideAudioManager(@ApplicationContext context: Context): AudioManager {
+        return context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
 }
