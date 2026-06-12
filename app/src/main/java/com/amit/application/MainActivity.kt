@@ -72,26 +72,23 @@ fun SuperAppNavigation() {
 // on click back form chat screen to chat_contact_list screen
         composable<AppRoutes.ChatRoomRoute> { backStackEntry ->
             val chatArgs: AppRoutes.ChatRoomRoute = backStackEntry.toRoute()
-
-            // 1. Create a temporary list to hold messages for UI testing
-            val messages = remember {
-                androidx.compose.runtime.mutableStateListOf<ChatMessage>()
-            }
+            val messages = remember { androidx.compose.runtime.mutableStateListOf<ChatMessage>() }
 
             ChatScreen(
                 messages = messages,
-                onSendMessage = { text, attachmentType, attachmentUri ->
-                    // 2. Add the new message to our UI list when you hit send
+                onSendMessage = { text, attachmentType, attachmentUri, repliedId, repliedText ->
                     messages.add(
-                        0, // Insert at the top of the list (since we use reverseLayout = true)
+                        0,
                         ChatMessage(
                             id = java.util.UUID.randomUUID().toString(),
                             text = text,
                             timestamp = System.currentTimeMillis(),
-                            isFromMe = true, // Forces it to the right side (Green bubble)
+                            isFromMe = true,
                             status = MessageStatus.PENDING,
                             attachmentType = attachmentType,
-                            attachmentUri = attachmentUri
+                            attachmentUri = attachmentUri,
+                            repliedToId = repliedId,     // Maps metadata
+                            repliedToText = repliedText  // Maps string text
                         )
                     )
                 },

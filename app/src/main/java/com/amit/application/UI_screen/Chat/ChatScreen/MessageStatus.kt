@@ -18,5 +18,9 @@ data class ChatMessage(
     val isFromMe: Boolean,
     var status: MessageStatus = MessageStatus.PENDING,
     val attachmentType: AttachmentType = AttachmentType.NONE,
-    val attachmentUri: String? = null
+    val attachmentUri: String? = null,
+    // ADD THESE TWO FIELDS FOR QUOTED REPLIES:
+    val repliedToId: String? = null,
+    val repliedToText: String? = null
 )
+

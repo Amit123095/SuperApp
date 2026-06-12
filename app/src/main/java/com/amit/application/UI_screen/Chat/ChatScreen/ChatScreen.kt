@@ -2,14 +2,16 @@ package com.amit.application.UI_screen.Chat.ChatScreen
 
 import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,20 +31,22 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Headset
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.Reply
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
@@ -53,6 +57,7 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,28 +66,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import coil3.compose.AsyncImage
+import com.amit.application.AppUtils.AudioRecorderManager
 import com.amit.application.AppUtils.CameraManager
 import com.amit.application.AppUtils.LocationManager
 import com.amit.application.AppUtils.SuperAppFileManager
 import kotlinx.coroutines.launch
 import java.io.File
-import com.amit.application.AppUtils.AudioRecorderManager
-import androidx.core.content.ContextCompat
-import android.content.pm.PackageManager
+import androidx.compose.ui.text.font.FontStyle
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun ChatScreen(
     messages: List<ChatMessage>,
-    onSendMessage: (String, AttachmentType, String?) -> Unit,
+    // --- NEW: TYPING STATE PARAMETERS ---
+    isFriendTyping: Boolean = false, // Set default so MainActivity doesn't crash!
+    onTypingStateChange: (Boolean) -> Unit = {},
+    onSendMessage: (String, AttachmentType, String?, String?, String?) -> Unit,
     onBackClick: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -90,6 +103,27 @@ fun ChatScreen(
 
     var messageText by remember { mutableStateOf("") }
     var showAttachmentMenu by remember { mutableStateOf(false) }
+
+    // --- 2. NEW: THE TYPING DEBOUNCE ENGINE ---
+    // This brilliantly tells the server you stopped typing if you pause for 2 seconds
+    var isTyping by remember { mutableStateOf(false) }
+
+    LaunchedEffect(messageText) {
+        if (messageText.isNotEmpty()) {
+            if (!isTyping) {
+                isTyping = true
+                onTypingStateChange(true) // Tell server we STARTED typing
+            }
+            delay(2000) // Wait for 2 seconds of inactivity
+            isTyping = false
+            onTypingStateChange(false) // Tell server we STOPPED typing
+        } else {
+            if (isTyping) {
+                isTyping = false
+                onTypingStateChange(false) // Instantly stop if text is deleted
+            }
+        }
+    }
 
     // Initialize our hardware managers locally
     val cameraManager = remember { CameraManager(context) }
@@ -103,6 +137,9 @@ fun ChatScreen(
     val audioRecorder = remember { AudioRecorderManager(context) }
     var isRecording by remember { mutableStateOf(false) }
     var tempAudioFile by remember { mutableStateOf<File?>(null) }
+
+    // Stores the message object currently being quoted above the keyboard input
+    var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
 
     // --- FUNCTIONAL LAUNCHERS ---
 
@@ -131,7 +168,9 @@ fun ChatScreen(
                             onSendMessage(
                                 "Shared a document: ${fileDetails.first}",
                                 AttachmentType.DOCUMENT,
-                                it.toString()
+                                it.toString(),
+                                null,
+                                null
                             )
                         }
                     }
@@ -154,7 +193,9 @@ fun ChatScreen(
                         onSendMessage(
                             "Sent a photo",
                             AttachmentType.IMAGE,
-                            it.toString()
+                            it.toString(),
+                            null,
+                            null
                         )
                     }
                 }
@@ -165,7 +206,13 @@ fun ChatScreen(
     val cameraLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { success ->
             if (success && tempCameraUri != null) {
-                onSendMessage("Captured Photo", AttachmentType.IMAGE, tempCameraUri.toString())
+                onSendMessage(
+                    "Captured Photo",
+                    AttachmentType.IMAGE,
+                    tempCameraUri.toString(),
+                    null,
+                    null
+                )
             }
         }
 
@@ -194,7 +241,7 @@ fun ChatScreen(
                     if (loc != null) {
                         val locMessage =
                             "📍 Current Location: https://maps.google.com/?q=${loc.latitude},${loc.longitude}"
-                        onSendMessage(locMessage, AttachmentType.LOCATION, null)
+                        onSendMessage(locMessage, AttachmentType.LOCATION, null, null, null)
                     } else {
                         Toast.makeText(
                             context,
@@ -230,7 +277,23 @@ fun ChatScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Friend's Chat") },
+                title = {
+                    Column {
+                        Text("Friend's Name", fontSize = 18.sp)
+                        // --- 3. NEW: DYNAMIC APP BAR UI ---
+                        if (isFriendTyping) {
+                            Text(
+                                text = "typing...",
+                                fontSize = 13.sp,
+                                color = Color(0xFF00897B),
+                                fontWeight = FontWeight.Medium,
+                                fontStyle = FontStyle.Italic
+                            )
+                        } else {
+                            Text(text = "Online", fontSize = 12.sp, color = Color.Gray)
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back")
@@ -239,57 +302,119 @@ fun ChatScreen(
             )
         },
         bottomBar = {
-            ChatBottomBar(
-                text = messageText,
-                isRecording = isRecording,
-                onTextChange = { messageText = it },
-                onAttachClick = { showAttachmentMenu = true },
-                onSendClick = {
-                    if (messageText.isNotBlank()) {
-                        onSendMessage(messageText, AttachmentType.NONE, null)
-                        messageText = ""
-                    }
-                },
-                // Pass Mic Hold logic
-                onStartRecording = {
-                    // Check if we ALREADY have permission
-                    val hasPermission = ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.RECORD_AUDIO
-                    ) == PackageManager.PERMISSION_GRANTED
-
-                    if (hasPermission) {
-                        // Safe to record immediately
-                        tempAudioFile = audioRecorder.startRecording()
-                        if (tempAudioFile != null) isRecording = true
-                    } else {
-                        // Ask for permission first (won't record this tap, user must tap again after granting)
-                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                    }
-                },
-                // Pass Mic Release logic
-                onStopRecording = {
-                    if (isRecording) {
-                        audioRecorder.stopRecording()
-                        isRecording = false
-
-                        // Save and Send the Audio File
-                        tempAudioFile?.let { file ->
-                            coroutineScope.launch {
-                                val savedUri = SuperAppFileManager.saveFileFromUri(
-                                    context,
-                                    Uri.fromFile(file),
-                                    file.name,
-                                    SuperAppFileManager.Category.AUDIO
+            Column(modifier = Modifier
+                .fillMaxWidth()
+                .background(Color.Transparent)) {
+                // DYNAMIC REPLY DOCKING STATION OVER THE INPUT ROW
+                replyingToMessage?.let { replySource ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                            .background(
+                                Color.White,
+                                RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
+                            )
+                            .drawBehind {
+                                drawLine(
+                                    color = Color(0xFF00897B),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(0f, size.height),
+                                    strokeWidth = 12f
                                 )
-                                savedUri?.let {
-                                    onSendMessage("Voice Note", AttachmentType.AUDIO, it.toString())
+                            }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (replySource.isFromMe) "Reply to yourself" else "Reply to Friend",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00897B)
+                            )
+                            Text(
+                                text = replySource.text,
+                                fontSize = 14.sp,
+                                color = Color.Gray,
+                                maxLines = 1
+                            )
+                        }
+                        IconButton(onClick = { replyingToMessage = null }) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Cancel Reply",
+                                tint = Color.Gray
+                            )
+                        }
+                    }
+                }
+                ChatBottomBar(
+                    text = messageText,
+                    isRecording = isRecording,
+                    onTextChange = { messageText = it },
+                    onAttachClick = { showAttachmentMenu = true },
+                    onSendClick = {
+                        if (messageText.isNotBlank()) {
+                            // Forward explicit target tracking metadata to your persistence layer
+                            onSendMessage(
+                                messageText,
+                                AttachmentType.NONE,
+                                null,
+                                replyingToMessage?.id,
+                                replyingToMessage?.text
+                            )
+                            messageText = ""
+                            replyingToMessage = null // Clear preview bar upon sending
+                        }
+                    },
+                    // Pass Mic Hold logic
+                    onStartRecording = {
+                        // Check if we ALREADY have permission
+                        val hasPermission = ContextCompat.checkSelfPermission(
+                            context,
+                            Manifest.permission.RECORD_AUDIO
+                        ) == PackageManager.PERMISSION_GRANTED
+
+                        if (hasPermission) {
+                            // Safe to record immediately
+                            tempAudioFile = audioRecorder.startRecording()
+                            if (tempAudioFile != null) isRecording = true
+                        } else {
+                            // Ask for permission first (won't record this tap, user must tap again after granting)
+                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                        }
+                    },
+                    // Pass Mic Release logic
+                    onStopRecording = {
+                        if (isRecording) {
+                            audioRecorder.stopRecording()
+                            isRecording = false
+
+                            // Save and Send the Audio File
+                            tempAudioFile?.let { file ->
+                                coroutineScope.launch {
+                                    val savedUri = SuperAppFileManager.saveFileFromUri(
+                                        context,
+                                        Uri.fromFile(file),
+                                        file.name,
+                                        SuperAppFileManager.Category.AUDIO
+                                    )
+                                    savedUri?.let {
+                                        onSendMessage(
+                                            "Voice Note",
+                                            AttachmentType.AUDIO,
+                                            it.toString(),
+                                            null,
+                                            null
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
-            )
+                )
+            }
         }
     ) { paddingValues ->
         LazyColumn(
@@ -302,7 +427,10 @@ fun ChatScreen(
         ) {
             groupedMessages.forEach { (dateString, messagesForDate) ->
                 items(messagesForDate) { msg ->
-                    MessageBubble(msg)
+                    MessageBubble(
+                        msg,
+                        onSwipeToReply = { selectedMessage -> replyingToMessage = selectedMessage }
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                 }
                 item {
@@ -390,25 +518,114 @@ fun AttachmentBottomSheet(
 }
 
 @Composable
-fun MessageBubble(message: ChatMessage) {
+fun MessageBubble(
+    message: ChatMessage,
+    onSwipeToReply: (ChatMessage) -> Unit, // Added callback
+) {
     val alignment = if (message.isFromMe) Alignment.CenterEnd else Alignment.CenterStart
     val backgroundColor = if (message.isFromMe) Color(0xFFE7FFDB) else Color.White
+
+    // Drag state tracking variables
+    val offsetX = remember { Animatable(0f) }
+    val density = LocalDensity.current
+    val scope = rememberCoroutineScope()
+    val swipeThreshold = with(density) { 60.dp.toPx() }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp)
+            // --- SWIPE GESTURE ENGINE ---
+            .pointerInput(Unit) {
+                detectHorizontalDragGestures(
+                    onDragEnd = {
+                        // If dragged past threshold to the right, trigger reply
+                        if (offsetX.value > swipeThreshold) {
+                            onSwipeToReply(message)
+                        }
+                        // Always snap back smoothly to center
+                        scope.launch { offsetX.animateTo(0f) }
+                    },
+                    onDragCancel = {
+                        scope.launch { offsetX.animateTo(0f) }
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        // Only allow swiping to the right (positive values)
+                        if (dragAmount > 0 || offsetX.value > 0) {
+                            scope.launch {
+                                offsetX.snapTo((offsetX.value + dragAmount).coerceAtLeast(0f))
+                            }
+                        }
+                    }
+                )
+            },
         contentAlignment = alignment
     ) {
+
+        // Background Reply Indicator Icon that appears behind the bubble during a swipe
+        if (offsetX.value > 10f) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .padding(start = 16.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Reply,
+                    contentDescription = "Reply",
+                    tint = Color(0xFF00897B),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+        }
+
         Surface(
             color = backgroundColor,
             shape = RoundedCornerShape(12.dp),
             shadowElevation = 1.dp,
-            modifier = Modifier.widthIn(min = 80.dp, max = 300.dp)
+            modifier = Modifier
+                .widthIn(min = 80.dp, max = 300.dp)
+                // Shift the bubble visually matching finger drag position
+                .graphicsLayer { translationX = offsetX.value }
         ) {
             Column(modifier = Modifier.padding(8.dp)) {
 
-                // --- 1. DYNAMIC MEDIA RENDERER ---
+                // --- SHOW QUOTED PREVIEW INSIDE THE BUBBLE ---
+                if (message.repliedToText != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .background(Color.Black.copy(alpha = 0.04f), RoundedCornerShape(6.dp))
+                            .drawBehind {
+                                // Draw the classic vertical colored bar on the left edge of reply preview
+                                drawLine(
+                                    color = Color(0xFF00897B),
+                                    start = Offset(0f, 0f),
+                                    end = Offset(0f, size.height),
+                                    strokeWidth = 8f
+                                )
+                            }
+                            .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 8.dp)
+                    ) {
+                        Column {
+                            Text(
+                                text = if (message.isFromMe) "You" else "Friend",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF00897B)
+                            )
+                            Text(
+                                text = message.repliedToText,
+                                fontSize = 13.sp,
+                                color = Color.Gray,
+                                maxLines = 2
+                            )
+                        }
+                    }
+                }
+
+                // --- MEDIA CONTENT LAYOUTS ---
                 when (message.attachmentType) {
                     AttachmentType.IMAGE -> {
                         message.attachmentUri?.let { uri ->
@@ -482,10 +699,7 @@ fun MessageBubble(message: ChatMessage) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .background(
-                                    Color(0xFFFFE0B2),
-                                    RoundedCornerShape(8.dp)
-                                ) // Light Orange background
+                                .background(Color(0xFFFFE0B2), RoundedCornerShape(8.dp))
                                 .padding(8.dp)
                                 .padding(bottom = 4.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -503,21 +717,17 @@ fun MessageBubble(message: ChatMessage) {
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFFE65100)
                             )
-                            // In the future, you can add a Play/Pause button and an ExoPlayer slider here!
                         }
                     }
 
-                    else -> {} // Do nothing for NONE
+                    else -> {}
                 }
 
-                // --- 2. TEXT RENDERING (Captions or Standard Text) ---
-                // We only show the text if it's a normal message, or a custom typed caption.
-                // We hide the ugly auto-generated texts like "Sent a photo"
+                // --- TEXT CONTENT LAYOUT ---
                 val hideAutoText = message.text in listOf(
                     "Captured Photo",
                     "Sent a photo"
                 ) || message.text.startsWith("📍 Current Location") || message.text.startsWith("Shared a document")
-
                 if (message.text.isNotBlank() && !hideAutoText) {
                     Text(
                         text = message.text,
@@ -527,7 +737,7 @@ fun MessageBubble(message: ChatMessage) {
                     )
                 }
 
-                // --- 3. TIME & STATUS ROW ---
+                // --- TIME / METRICS FOOTER ---
                 Row(
                     modifier = Modifier.align(Alignment.End),
                     verticalAlignment = Alignment.CenterVertically
@@ -537,14 +747,13 @@ fun MessageBubble(message: ChatMessage) {
                         fontSize = 11.sp,
                         color = Color.Gray
                     )
-
                     if (message.isFromMe) {
                         Spacer(modifier = Modifier.width(4.dp))
                         val (icon, tint) = when (message.status) {
                             MessageStatus.PENDING -> Icons.Default.CheckCircle to Color.LightGray
                             MessageStatus.SENT -> Icons.Default.Check to Color.Gray
                             MessageStatus.DELIVERED -> Icons.Default.CheckCircle to Color.Gray
-                            MessageStatus.READ -> Icons.Default.CheckCircle to Color(0xFF34B7F1) // WhatsApp Blue
+                            MessageStatus.READ -> Icons.Default.CheckCircle to Color(0xFF34B7F1)
                         }
                         Icon(
                             icon,
@@ -635,22 +844,25 @@ fun ChatBottomBar(
 
         Box(
             modifier = Modifier
-                .size(50.dp) // Standard FAB size
+                .size(56.dp) // Standard FAB size
                 .background(Color(0xFF00897B), CircleShape)
                 .pointerInput(isTextEmpty) { // Re-evaluate pointer input if text state changes
-                    if (isTextEmpty) {
-                        detectTapGestures(
-                            onPress = {
+                    detectTapGestures(
+                        onPress = {
+                            // User is holding the Microphone
+                            if (isTextEmpty) {
                                 onStartRecording()
                                 tryAwaitRelease() // Waits until the user lifts their finger
                                 onStopRecording()
                             }
-                        )
-                    }
-                }
-                .clickable(enabled = !isTextEmpty) {
-                    // Only clickable traditionally if it's the Send button
-                    if (!isTextEmpty) onSendClick()
+                        },
+                        onTap = {
+                            if (!isTextEmpty) {
+                                // User tapped the Send Button
+                                onSendClick()
+                            }
+                        }
+                    )
                 },
             contentAlignment = Alignment.Center
         ) {
