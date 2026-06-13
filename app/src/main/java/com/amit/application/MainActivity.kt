@@ -75,6 +75,8 @@ fun SuperAppNavigation() {
             val messages = remember { androidx.compose.runtime.mutableStateListOf<ChatMessage>() }
 
             ChatScreen(
+                friendName = chatArgs.friendName,
+                friendNumber = chatArgs.friendNumber, // Pass the number!
                 messages = messages,
                 onSendMessage = { text, attachmentType, attachmentUri, repliedId, repliedText ->
                     messages.add(
@@ -92,7 +94,8 @@ fun SuperAppNavigation() {
                         )
                     )
                 },
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onWalletClick = { navController.navigate(AppRoutes.WalletRoute) } // Route to Wallet
             )
         }
 
